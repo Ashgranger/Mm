@@ -83,7 +83,7 @@ WS_URL            = os.getenv("LIGHTER_WS_URL",     "wss://mainnet.zklighter.ell
 ACCOUNT_INDEX     = int(os.getenv("LIGHTER_ACCOUNT_INDEX", "0"))
 API_KEYS: Dict[int, str] = {}   # populated in load_api_keys()
 
-MARKET_INDEX          = int(os.getenv("LIGHTER_MARKET_INDEX",    "0"))
+MARKET_INDEX          = int(os.getenv("LIGHTER_MARKET_INDEX",    "92"))
 ORDER_SIZE_BASE       = float(os.getenv("ORDER_SIZE_BASE",        "0.01"))
 MAX_INVENTORY_BASE    = float(os.getenv("MAX_INVENTORY",          "0.1"))
 MIN_SPREAD_BPS        = float(os.getenv("MIN_SPREAD_BPS",         "1.0"))
@@ -779,7 +779,7 @@ class SpreadBot:
         if desired is None:
             log.debug(
                 f"{tag}No quote opportunity  "
-                f"spread={spread_bps:.2f if spread_bps else 'n/a'}bps  "
+                f"spread={f'{spread_bps:.2f}' if spread_bps is not None else 'n/a'}bps  "
                 f"(need ≥ {MIN_SPREAD_BPS}bps)"
             )
             for rec in (self.bid_order, self.ask_order):
