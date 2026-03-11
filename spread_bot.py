@@ -396,12 +396,16 @@ class SpreadBot:
 
     # ── WebSocket callbacks ───────────────────────────────────
 
-    def on_order_book_update(self, market_id: int, order_book: dict):
-        if market_id != MARKET_INDEX:
-            return
+    def on_order_book_update(self, market_id, order_book: dict):
+        # market_id arrives as a string from the WS channel name (e.g. "0")
         try:
+            if int(market_id) != MARKET_INDEX:
+                return
             asks = order_book.get("asks", [])
             bids = order_book.get("bids", [])
+            # Filter out zero-size levels just in case
+            asks = [a for a in asks if float(a.get("size", 0)) > 0]
+            bids = [b for b in bids if float(b.get("size", 0)) > 0]
             if asks and bids:
                 self.best_ask  = float(asks[0]["price"])
                 self.best_bid  = float(bids[0]["price"])
@@ -410,7 +414,7 @@ class SpreadBot:
         except Exception as e:
             log.debug(f"OB parse error: {e}")
 
-    def on_account_update(self, account_id: int, account: dict):
+    def on_account_update(self, account_id, account: dict):
         if self.dry_run:
             return   # fills handled by DryRunExchange directly
         orders = account.get("orders", [])
@@ -983,12 +987,21 @@ async def main():
     ws_thread = threading.Thread(target=ws.run, daemon=True, name="ws-thread")
     ws_thread.start()
 
-    log.info("⏳ Waiting for first order book tick...")
+    log.info(f"⏳ Waiting for first order book tick from wss://{ws_host}/stream ...")
     timeout_s = 30
     t_start   = time.time()
+    last_log  = t_start
     while bot.mid_price is None:
-        if time.time() - t_start > timeout_s:
-            raise RuntimeError("Timed out waiting for WebSocket order book data")
+        elapsed = time.time() - t_start
+        if elapsed > timeout_s:
+            raise RuntimeError(
+                f"Timed out after {timeout_s}s waiting for WebSocket order book data.\n"
+                f"Check that {BASE_URL} is reachable and LIGHTER_MARKET_INDEX={MARKET_INDEX} exists."
+            )
+        # Heartbeat every 5s so we know the loop is alive
+        if time.time() - last_log >= 5:
+            log.info(f"  ... still waiting ({elapsed:.0f}s)  ws_thread_alive={ws_thread.is_alive()}")
+            last_log = time.time()
         await asyncio.sleep(0.05)
 
     log.info(
