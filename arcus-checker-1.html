@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Check Arcus leaderboard rank, PnL, fees and volume for any public wallet address.">
+<title>Arcus Checker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    box-sizing:border-box;
+    --bg:#0a0a0d;
+    --bg-soft:#111114;
+    --card:#131317;
+    --card-2:#0d0d10;
+    --border:#242429;
+    --border-soft:#1c1c21;
+    --text:#f5f5f7;
+    --text-dim:#98989f;
+    --text-faint:#69696f;
+    --accent:#7c8cff;
+    --accent-2:#5ee6b8;
+    --danger:#ff8080;
+    --danger-bg:rgba(255,110,110,.08);
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    --pos:#5ee6b8;
+    --neg:#ff8080;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+    min-height:100%;
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(124,140,255,.10), transparent 45%),
+      radial-gradient(circle at 85% 15%, rgba(94,230,184,.07), transparent 40%);
+    background-attachment:fixed;
+  }
+  html,body{height:100%}
+  ::selection{background:var(--accent);color:#0a0a0d}
+
+  .shell{width:min(880px,calc(100% - 32px));margin:0 auto;padding:56px 0 48px;}
+
+  /* Hero */
+  .brand{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:800;letter-spacing:.16em;color:var(--text-dim);text-transform:uppercase}
+  .brand .dot{width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:0 0 14px rgba(124,140,255,.7)}
+  .hero{margin-bottom:26px}
+  .hero h1{font-size:clamp(32px,6.4vw,58px);line-height:1.02;letter-spacing:-.04em;margin:18px 0 12px;font-weight:800}
+  .hero p{max-width:560px;color:var(--text-dim);font-size:15.5px;line-height:1.65;margin:0}
+
+  /* Card base */
+  .card{
+    background:linear-gradient(180deg,var(--card),var(--card-2));
+    border:1px solid var(--border);border-radius:20px;padding:22px;
+    box-shadow:0 1px 0 rgba(255,255,255,.02) inset, 0 20px 40px -28px rgba(0,0,0,.8);
+  }
+
+  .search-card label{display:block;font-size:12.5px;font-weight:700;margin-bottom:10px;color:#c7c7cd;letter-spacing:.01em}
+  .search-row{display:flex;gap:10px}
+  .search-row input{
+    min-width:0;flex:1;background:#08080a;border:1px solid #2a2a30;color:#fff;border-radius:13px;
+    padding:15px 16px;font:15px var(--mono);outline:none;transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .search-row input::placeholder{color:#55555c}
+  .search-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,140,255,.15)}
+  .search-row input.invalid{border-color:var(--danger)}
+  .search-row button{
+    border:0;border-radius:13px;padding:0 24px;background:var(--text);color:#0a0a0d;font-weight:800;font-size:14.5px;
+    cursor:pointer;transition:transform .1s ease, opacity .15s ease;white-space:nowrap;
+  }
+  .search-row button:hover{opacity:.88}
+  .search-row button:active{transform:scale(.97)}
+  .search-row button:disabled{opacity:.5;cursor:default}
+  .hint{margin-top:11px;color:var(--text-faint);font-size:12px;display:flex;align-items:center;gap:6px}
+  .hint svg{flex:none;opacity:.8}
+  .error{
+    display:none;margin-top:12px;color:var(--danger);font-size:13px;background:var(--danger-bg);
+    border:1px solid rgba(255,110,110,.25);border-radius:10px;padding:10px 12px;
+  }
+  .error.show{display:flex;align-items:center;gap:8px}
+
+  /* Results */
+  #results{margin-top:22px}
+  #results.hidden{display:none}
+  .toolbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+  .address-row{display:flex;align-items:center;gap:8px;cursor:pointer}
+  .address{font-family:var(--mono);font-size:13.5px;word-break:break-all;color:#e4e4e8}
+  .address-row svg{flex:none;opacity:.5;transition:opacity .15s ease}
+  .address-row:hover svg{opacity:.9}
+  .status{color:var(--text-faint);font-size:12px;margin-top:6px;display:flex;align-items:center;gap:6px}
+  .status .live{width:6px;height:6px;border-radius:50%;background:var(--pos);box-shadow:0 0 8px var(--pos)}
+  .status .live.busy{background:var(--accent);box-shadow:0 0 8px var(--accent);animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .secondary{
+    height:38px;padding:0 15px;background:var(--bg-soft);color:#eee;border:1px solid var(--border);
+    border-radius:11px;font-weight:700;font-size:13px;cursor:pointer;transition:border-color .15s ease,background .15s ease;
+  }
+  .secondary:hover{border-color:#3a3a41;background:#17171b}
+
+  .tabs{display:flex;gap:6px;margin-bottom:14px;background:#0c0c0f;border:1px solid var(--border-soft);padding:4px;border-radius:12px;width:max-content}
+  .tabs button{
+    background:transparent;color:#888;border:0;border-radius:9px;padding:8px 16px;cursor:pointer;font-weight:700;font-size:13px;
+    transition:background .15s ease,color .15s ease;
+  }
+  .tabs button.active{background:var(--bg-soft);color:#fff;box-shadow:0 1px 0 rgba(255,255,255,.04) inset}
+  .tabs button:not(.active):hover{color:#bbb}
+
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .stat{
+    border-radius:17px;padding:19px 20px;min-height:116px;display:flex;flex-direction:column;justify-content:space-between;
+    position:relative;overflow:hidden;transition:transform .18s ease,border-color .18s ease;
+  }
+  .stat::before{
+    content:"";position:absolute;top:0;left:16px;right:16px;height:2px;border-radius:0 0 3px 3px;
+    background:linear-gradient(90deg,transparent,var(--stat-c,var(--border)),transparent);opacity:.9;
+  }
+  .stat:hover{transform:translateY(-2px);border-color:#33333a}
+  .stat .row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .stat span{font-size:11px;color:var(--text-faint);font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+  .stat svg{opacity:.55;flex:none}
+  .stat strong{font-size:clamp(20px,3.6vw,31px);letter-spacing:-.03em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums;transition:opacity .15s ease}
+  .stat.rank{--stat-c:var(--accent)}
+  .stat.rank strong{color:var(--accent)}
+  .stat.pos{--stat-c:var(--pos)}
+  .stat.pos strong{color:var(--pos)}
+  .stat.neg{--stat-c:var(--danger)}
+  .stat.neg strong{color:var(--danger)}
+  .stat.loading strong{opacity:.25}
+  .stat .shimmer{
+    position:absolute;inset:0;pointer-events:none;opacity:0;
+    background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.06) 50%,transparent 70%);
+    background-size:200% 100%;
+  }
+  .stat.loading .shimmer{opacity:1;animation:shimmer 1.3s infinite}
+  @keyframes shimmer{0%{background-position:160% 0}100%{background-position:-60% 0}}
+
+  .details{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:10px}
+  .details div{display:flex;flex-direction:column;gap:7px}
+  .details span{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.03em;font-weight:700}
+  .details b{font-family:var(--mono);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;color:#d6d6db;font-weight:500}
+
+  .footnote{color:#5c5c63;font-size:11.5px;line-height:1.6;margin:16px 2px 0}
+  .hidden{display:none}
+  footer{text-align:center;color:#4c4c53;font-size:11.5px;margin-top:38px}
+  a{color:#a6a6ac;text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  .fade-in{animation:fadeIn .35s ease both}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+  @media(max-width:700px){
+    .shell{padding-top:36px}
+    .search-row{flex-direction:column}
+    .search-row button{height:48px}
+    .grid{grid-template-columns:repeat(2,1fr)}
+    .details{grid-template-columns:repeat(2,1fr)}
+    .toolbar{flex-direction:column;align-items:flex-start}
+  }
+
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#f6f6f8;--bg-soft:#fff;--card:#ffffff;--card-2:#fafafb;--border:#e4e4e9;--border-soft:#ececef;
+      --text:#0d0d10;--text-dim:#5b5b63;--text-faint:#8a8a92;--danger-bg:rgba(255,80,80,.08);
+    }
+  }
+</style>
+</head>
+<body>
+<main class="shell">
+  <header class="hero">
+    <div class="brand"><span class="dot"></span> ARCUS CHECKER</div>
+    <h1>Check your Arcus stats.</h1>
+    <p>Enter a public wallet address to fetch rank, PnL, fees and volume from the Arcus leaderboard.</p>
+  </header>
+
+  <section class="card search-card">
+    <label for="wallet">Wallet address</label>
+    <div class="search-row">
+      <input id="wallet" autocomplete="off" spellcheck="false" placeholder="0x..." aria-label="Ethereum wallet address">
+      <button id="check">Check</button>
+    </div>
+    <div class="hint">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M12 3l9 16H3z"/></svg>
+      No wallet connection or private key required.
+    </div>
+    <div id="error" class="error" role="alert"></div>
+  </section>
+
+  <section id="results" class="hidden">
+    <div class="toolbar">
+      <div>
+        <div class="address-row" id="addressRow" title="Copy address">
+          <div id="address" class="address"></div>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </div>
+        <div id="status" class="status"></div>
+      </div>
+      <button id="copy" class="secondary">Copy summary</button>
+    </div>
+
+    <nav class="tabs" aria-label="Time period">
+      <button data-window="all" class="active">All time</button>
+      <button data-window="30d">30d</button>
+      <button data-window="24h">24h</button>
+    </nav>
+
+    <div class="grid">
+      <article class="stat rank card">
+        <div class="row"><span>Rank</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8M12 17v4M7 4h10l-1 8a4 4 0 0 1-8 0L7 4z"/><path d="M5 4H3v2a4 4 0 0 0 4 4M19 4h2v2a4 4 0 0 1-4 4"/></svg></div>
+        <strong id="rank">—</strong>
+        <div class="shimmer"></div>
+      </article>
+      <article class="stat pnl card">
+        <div class="row"><span>PnL</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg></div>
+        <strong id="pnl">—</strong>
+        <div class="shimmer"></div>
+      </article>
+      <article class="stat fees card">
+        <div class="row"><span>Fees paid</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M15 9.5c0-1.4-1.3-2.5-3-2.5s-3 1-3 2.3c0 3 6 1.4 6 4.4 0 1.4-1.3 2.3-3 2.3s-3-1-3-2.3"/></svg></div>
+        <strong id="fees">—</strong>
+        <div class="shimmer"></div>
+      </article>
+      <article class="stat volume card">
+        <div class="row"><span>Volume</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg></div>
+        <strong id="volume">—</strong>
+        <div class="shimmer"></div>
+      </article>
+    </div>
+
+    <div class="card details">
+      <div><span>Period</span><b id="period">—</b></div>
+      <div><span>Raw volume</span><b id="rawVolume">—</b></div>
+      <div><span>Raw fees</span><b id="rawFees">—</b></div>
+      <div><span>Raw PnL</span><b id="rawPnl">—</b></div>
+    </div>
+
+    <p class="footnote">Values are formatted from the integer units returned by the Arcus leaderboard API (raw ÷ 1e9). This site does not custody funds or request wallet signatures.</p>
+  </section>
+
+  <footer>Data source: <a href="https://api.arcus.xyz" target="_blank" rel="noreferrer">Arcus API</a></footer>
+</main>
+
+<script>
+const API = "https://api.arcus.xyz/v1/leaderboard";
+const walletInput = document.querySelector("#wallet");
+const checkBtn = document.querySelector("#check");
+const errorEl = document.querySelector("#error");
+const results = document.querySelector("#results");
+const addressEl = document.querySelector("#address");
+const addressRow = document.querySelector("#addressRow");
+const statusEl = document.querySelector("#status");
+const pnlStat = document.querySelector(".stat.pnl");
+
+// Arcus leaderboard API returns raw integers scaled by 1e9, not 1e6.
+const UNIT_DIVISOR = 1e9;
+
+let currentWallet = "", currentWindow = "all", cache = {};
+
+const validAddress = v => /^0x[a-fA-F0-9]{40}$/.test(v.trim());
+const fmt = n => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(n);
+
+function usd(n){
+  const s = n < 0 ? "-" : "", x = Math.abs(n);
+  if (x >= 1e12) return s + "$" + fmt(x/1e12) + "T";
+  if (x >= 1e9)  return s + "$" + fmt(x/1e9)  + "B";
+  if (x >= 1e6)  return s + "$" + fmt(x/1e6)  + "M";
+  if (x >= 1e3)  return s + "$" + fmt(x/1e3)  + "K";
+  return s + "$" + fmt(x);
+}
+
+function showError(m){
+  errorEl.textContent = m;
+  errorEl.classList.toggle("show", !!m);
+  walletInput.classList.toggle("invalid", !!m);
+}
+
+function setLoading(on){
+  checkBtn.disabled = on;
+  document.querySelectorAll(".stat").forEach(el => el.classList.toggle("loading", on));
+}
+
+async function fetchStats(wallet, win){
+  const key = wallet.toLowerCase() + ":" + win;
+  if (cache[key]) return cache[key];
+  const u = new URL(API);
+  u.searchParams.set("window", win);
+  u.searchParams.set("sortBy", "volume");
+  u.searchParams.set("address", wallet);
+  const r = await fetch(u, { headers: { Accept: "application/json" } });
+  if (!r.ok) throw new Error(`Arcus API returned HTTP ${r.status}`);
+  const d = await r.json();
+  if (!d.entries?.length) throw new Error("No leaderboard entry found for this wallet.");
+  return cache[key] = d.entries[0];
+}
+
+function render(e){
+  const pnl = Number(e.pnl) / UNIT_DIVISOR;
+  document.querySelector("#rank").textContent = e.rank != null ? "#" + e.rank : "—";
+  document.querySelector("#pnl").textContent = usd(pnl);
+  document.querySelector("#fees").textContent = usd(Number(e.feesPaid) / UNIT_DIVISOR);
+  document.querySelector("#volume").textContent = usd(Number(e.volume) / UNIT_DIVISOR);
+  document.querySelector("#period").textContent = currentWindow === "all" ? "All time" : currentWindow;
+  document.querySelector("#rawVolume").textContent = Number(e.volume).toLocaleString();
+  document.querySelector("#rawFees").textContent = Number(e.feesPaid).toLocaleString();
+  document.querySelector("#rawPnl").textContent = Number(e.pnl).toLocaleString();
+
+  pnlStat.classList.remove("pos", "neg");
+  pnlStat.classList.add(pnl >= 0 ? "pos" : "neg");
+
+  document.querySelectorAll(".grid .stat").forEach(el => {
+    el.classList.remove("fade-in");
+    void el.offsetWidth;
+    el.classList.add("fade-in");
+  });
+}
+
+async function check(win = currentWindow){
+  showError("");
+  statusEl.innerHTML = '<span class="live busy"></span> Loading…';
+  setLoading(true);
+  try {
+    const e = await fetchStats(currentWallet, win);
+    currentWindow = win;
+    render(e);
+    statusEl.innerHTML = '<span class="live"></span> Updated just now';
+  } catch (err) {
+    showError(err.message || "Unable to load Arcus data.");
+    statusEl.textContent = "";
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function start(){
+  const w = walletInput.value.trim();
+  if (!validAddress(w)) {
+    showError("Enter a valid 0x wallet address.");
+    return;
+  }
+  currentWallet = w;
+  cache = {};
+  addressEl.textContent = w;
+  results.classList.remove("hidden");
+  await check("all");
+}
+
+checkBtn.addEventListener("click", start);
+walletInput.addEventListener("input", () => showError(""));
+walletInput.addEventListener("keydown", e => { if (e.key === "Enter") start(); });
+
+document.querySelectorAll(".tabs button").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    check(b.dataset.window);
+  });
+});
+
+addressRow.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(currentWallet);
+    const original = addressEl.textContent;
+    addressEl.textContent = "Copied!";
+    setTimeout(() => addressEl.textContent = original, 1000);
+  } catch {
+    showError("Clipboard access was blocked by the browser.");
+  }
+});
+
+document.querySelector("#copy").addEventListener("click", async () => {
+  const copyBtn = document.querySelector("#copy");
+  const text = `Arcus stats
+Wallet: ${currentWallet}
+Period: ${currentWindow}
+Rank: ${document.querySelector("#rank").textContent}
+PnL: ${document.querySelector("#pnl").textContent}
+Fees: ${document.querySelector("#fees").textContent}
+Volume: ${document.querySelector("#volume").textContent}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    copyBtn.textContent = "Copied!";
+    setTimeout(() => copyBtn.textContent = "Copy summary", 1200);
+  } catch {
+    showError("Clipboard access was blocked by the browser.");
+  }
+});
+</script>
+</body>
+</html>
